@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Type checking / linting
+.mypy_cache/
+.ruff_cache/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Python packaging
+*.egg-info/
+build/
+dist/
+
+# Application runtime data
+data/metadata/*.db
+data/processed/*
+data/indexes/*
+
+# Source documents
+data/raw/*
+!data/raw/.gitkeep
+
+# Logs
+*.log
+
+# Keep runtime directory structure
+!data/processed/.gitkeep
+!data/indexes/.gitkeep
+data/*.db

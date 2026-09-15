@@ -1,0 +1,16 @@
+[
+  {
+    "case_id": "perplexity-models",
+    "question": "what models does perplexity use",
+    "source_filename": "Chapter 1 - The Overview of Map of GenAI.pdf",
+    "expected_pages": [4],
+    "expected_keywords": ["GPT-4", "Claude", "Sonar"]
+  },
+  {
+    "case_id": "nine-layer-ecosystem",
+    "question": "what are the layers of the AI ecosystem",
+    "source_filename": "Chapter 1 - The Overview of Map of GenAI.pdf",
+    "expected_pages": [17],
+    "expected_keywords": ["Research", "Foundation", "Platform", "Distribution"]
+  }
+]

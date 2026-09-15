@@ -1,0 +1,43 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama
+    # Not published to the host -- only the api service needs to reach
+    # it, over the internal Docker network at http://ollama:11434.
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    env_file:
+      - ../.env.production
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+    volumes:
+      - app_data:/data
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  ollama_models:
+  app_data:
+  caddy_data:
+  caddy_config:

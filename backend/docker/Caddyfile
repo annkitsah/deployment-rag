@@ -1,0 +1,9 @@
+# Replace with your real domain, pointed at this VM's public IP via a
+# DNS A record. Caddy automatically obtains and renews a free TLS
+# certificate from Let's Encrypt for whatever domain is listed here --
+# this is what makes the backend reachable over HTTPS, which the
+# Vercel-hosted frontend requires (a browser on an HTTPS page blocks
+# calls to a plain-HTTP backend).
+your-backend-domain.example.com {
+    reverse_proxy api:8000
+}
