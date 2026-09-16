@@ -712,7 +712,7 @@ __turbopack_context__.s([
     "uploadDocument",
     ()=>uploadDocument
 ]);
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = ("TURBOPACK compile-time value", "https://deployment-rag-production.up.railway.app") || "http://localhost:8000";
 async function handleResponse(res) {
     if (!res.ok) {
         let detail = `Request failed with status ${res.status}`;
