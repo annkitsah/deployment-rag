@@ -51,9 +51,15 @@ app.include_router(query_router)
 
 @app.get("/health")
 async def health_check() -> dict[str, str | int]:
+    # Live count so pages ingested after startup show up in the UI.
+    try:
+        live_count = container.page_store.count_all_pages()
+    except Exception:
+        live_count = getattr(app.state, "indexed_page_count", 0)
+
     return {
         "status": "healthy",
         "service": settings.app_name,
         "environment": settings.app_env,
-        "indexed_pages": getattr(app.state, "indexed_page_count", 0),
+        "indexed_pages": live_count,
     }
