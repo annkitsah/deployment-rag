@@ -8,9 +8,9 @@ import {
   runQuery,
   getHealth,
   QueryResponse,
-  Citation,
   API_URL,
 } from "@/lib/api";
+import { AnswerView } from "@/components/AnswerView";
 
 type Tab = "query" | "documents";
 
@@ -210,53 +210,12 @@ export default function Home() {
             )}
 
             {result && (
-              <div className="space-y-4">
-                <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                  <div className="mb-2 flex items-center justify-between">
-                    <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">
-                      Answer
-                    </h2>
-                    <span className="text-xs text-zinc-400">
-                      {result.iterations} iteration{result.iterations !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                  <div className="prose prose-sm max-w-none whitespace-pre-wrap dark:prose-invert">
-                    {result.answer}
-                  </div>
-                </div>
-
-                {result.citations.length > 0 && (
-                  <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                    <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-500">
-                      Citations
-                    </h2>
-                    <ul className="space-y-2">
-                      {result.citations.map((c: Citation, i: number) => (
-                        <li
-                          key={`${c.document_id}-${c.page_number}-${i}`}
-                          className="flex items-start gap-3 rounded-lg bg-zinc-50 px-3 py-2 text-sm dark:bg-zinc-950"
-                        >
-                          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-xs font-medium dark:bg-zinc-800">
-                            {i + 1}
-                          </span>
-                          <div>
-                            <span className="font-medium">
-                              {c.filename ?? c.document_id}
-                            </span>
-                            <span className="text-zinc-500">
-                              {" "}
-                              · page {c.page_number}
-                            </span>
-                            <span className="ml-2 text-xs text-zinc-400">
-                              score {c.score.toFixed(3)}
-                            </span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
+              <AnswerView
+                query={result.query}
+                answer={result.answer}
+                iterations={result.iterations}
+                citations={[...result.citations]}
+              />
             )}
           </div>
         )}
@@ -337,4 +296,3 @@ export default function Home() {
     </div>
   );
 }
-
