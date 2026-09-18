@@ -24,6 +24,10 @@ from app.retrieval.inverted_index import InvertedIndex
 from app.retrieval.lexical import LexicalRetriever
 from app.retrieval.page_index import PageIndex
 from app.retrieval.service import RetrievalService
+from app.generation.provider import GenerationProvider
+from app.generation.providers.groq import GroqGenerationProvider
+from app.generation.providers.mistral import MistralGenerationProvider
+from app.generation.providers.ollama import OllamaGenerationProvider
 
 
 class ApplicationContainer:
@@ -178,19 +182,24 @@ class ApplicationContainer:
         )
 
     def _build_generation_provider(self) -> GenerationProvider:
-        """Build the text generation provider.
+        provider = (self.settings.generation_provider or "groq").strip().lower()
 
-        - Uses Mistral when MISTRAL_API_KEY is set and Ollama is still
-          pointing at localhost (typical for Railway / cloud deploys).
-        - Uses local Ollama otherwise (local development).
-        """
+        if provider == "groq":
+            if not self.settings.groq_api_key:
+                raise RuntimeError(
+                    "GROQ_API_KEY is required when GENERATION_PROVIDER=groq."
+                )
+            return GroqGenerationProvider(
+                api_key=self.settings.groq_api_key,
+                default_model=self.settings.groq_model,
+                timeout_ms=self.settings.groq_generation_timeout_ms,
+            )
 
-        ollama_is_local = (
-            "localhost" in self.settings.ollama_base_url
-            or "127.0.0.1" in self.settings.ollama_base_url
-        )
-
-        if self.settings.mistral_api_key and ollama_is_local:
+        if provider == "mistral":
+            if not self.settings.mistral_api_key:
+                raise RuntimeError(
+                    "MISTRAL_API_KEY is required when GENERATION_PROVIDER=mistral."
+                )
             return MistralGenerationProvider(
                 api_key=self.settings.mistral_api_key,
                 default_model=self.settings.mistral_generation_model,

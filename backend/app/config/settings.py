@@ -79,6 +79,16 @@ class Settings(BaseSettings):
 
     ocr_enabled: bool = True
 
+    # Generation provider: "groq" | "mistral" | "ollama"
+    generation_provider: str = "groq"
+
+    groq_api_key: str | None = None
+    groq_model: str = "llama-3.1-8b-instant"
+    groq_generation_timeout_ms: int = Field(
+        default=120_000,
+        gt=0,
+    )
+
     @property
     def cors_allowed_origins_list(self) -> list[str]:
         """Parse the comma-separated CORS origins setting into a list."""
