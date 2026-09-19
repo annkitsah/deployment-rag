@@ -50,21 +50,55 @@ export default function Home() {
       .catch(() => setHealth(null));
   }, [refreshDocuments]);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.name.toLowerCase().endsWith(".pdf")) {
       setUploadError("Only PDF files are supported.");
+      e.target.value = "";
       return;
     }
+
+    const sizeMb = file.size / (1024 * 1024);
+
+    // Hard limit: block and show popup if over 50 MB
+    if (sizeMb > 50) {
+      window.alert(
+        `File size limit exceeded\n\n` +
+          `This PDF is ${sizeMb.toFixed(1)} MB.\n` +
+          `Maximum allowed size is 50 MB.\n\n` +
+          `Please split the PDF or upload a smaller file.`
+      );
+      setUploadError(
+        `File is ${sizeMb.toFixed(1)} MB and exceeds the 50 MB limit. Please upload a smaller PDF.`
+      );
+      e.target.value = "";
+      return;
+    }
+
+    // Soft warning: 30–50 MB may be slow on free-tier OCR
+    if (sizeMb > 30) {
+      const ok = window.confirm(
+        `Large PDF (${sizeMb.toFixed(1)} MB)\n\n` +
+          `Files under 30 MB work most reliably.\n` +
+          `This file may take longer and is more likely to hit OCR rate limits.\n\n` +
+          `Continue with upload?`
+      );
+      if (!ok) {
+        e.target.value = "";
+        return;
+      }
+    }
+
     setUploading(true);
     setUploadError(null);
     try {
       const doc = await uploadDocument(file);
       await refreshDocuments();
-      if (!doc.duplicate) {
-        setSelectedDocId(doc.document_id);
-      }
+      getHealth()
+        .then((h) => setHealth({ status: h.status, indexed_pages: h.indexed_pages }))
+        .catch(() => null);
+      setSelectedDocId(doc.document_id);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -224,7 +258,8 @@ export default function Home() {
           <div className="space-y-6">
             <div className="rounded-xl border border-dashed border-zinc-300 bg-white p-6 text-center dark:border-zinc-700 dark:bg-zinc-900">
               <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
-                Upload a PDF to ingest (OCR + lexical index)
+                Recommended: under 25 pages and 30 MB. Hard limit: 50 MB.
+                Large files may hit rate limits or time out.
               </p>
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white">
                 {uploading ? "Uploading & ingesting…" : "Choose PDF"}
