@@ -215,3 +215,15 @@ class DocumentRepository:
                     (status.value, page_count, document_id),
                 )
             connection.commit()
+
+
+    def delete(self, document_id: str) -> bool:
+        """Delete a document metadata row. Returns True if a row was removed."""
+
+        with sqlite3.connect(self.database_path) as connection:
+            cursor = connection.execute(
+                "DELETE FROM documents WHERE document_id = ?",
+                (document_id,),
+            )
+            connection.commit()
+            return cursor.rowcount > 0

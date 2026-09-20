@@ -5,6 +5,7 @@ import {
   Document,
   listDocuments,
   uploadDocument,
+  deleteDocument,
   runQuery,
   getHealth,
   getDocumentProgress,
@@ -33,7 +34,6 @@ export default function Home() {
   const [health, setHealth] = useState<{ status: string; indexed_pages: number } | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  // Helper function to update health state to avoid repeated calls
   const fetchHealth = useCallback(() => {
     getHealth()
       .then((h) => setHealth({ status: h.status, indexed_pages: h.indexed_pages }))
@@ -70,7 +70,6 @@ export default function Home() {
 
     const sizeMb = file.size / (1024 * 1024);
 
-    // Hard limit: block and show popup if over 50 MB
     if (sizeMb > 50) {
       window.alert(
         `File size limit exceeded\n\n` +
@@ -85,7 +84,6 @@ export default function Home() {
       return;
     }
 
-    // Soft warning: 30–50 MB may be slow on free-tier OCR
     if (sizeMb > 30) {
       const ok = window.confirm(
         `Large PDF (${sizeMb.toFixed(1)} MB)\n\n` +
@@ -112,7 +110,6 @@ export default function Home() {
         setIngestProgress(null);
         fetchHealth();
       } else {
-        // Poll background OCR progress
         const id = doc.document_id;
         for (let i = 0; i < 600; i++) {
           await new Promise((r) => setTimeout(r, 1500));
@@ -131,7 +128,7 @@ export default function Home() {
               break;
             }
           } catch {
-            // keep polling briefly if one request fails
+            // keep polling
           }
         }
       }
@@ -140,6 +137,22 @@ export default function Home() {
     } finally {
       setUploading(false);
       e.target.value = "";
+    }
+  };
+
+  const handleDelete = async (documentId: string, filename: string) => {
+    const ok = window.confirm(
+      `Delete "${filename}"?\n\nThis removes the document and its indexed pages.`
+    );
+    if (!ok) return;
+
+    try {
+      await deleteDocument(documentId);
+      if (selectedDocId === documentId) setSelectedDocId(null);
+      await refreshDocuments();
+      fetchHealth();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Delete failed");
     }
   };
 
@@ -365,15 +378,23 @@ export default function Home() {
                           {new Date(d.created_at).toLocaleString()}
                         </p>
                       </div>
-                      <button
-                        onClick={() => {
-                          setSelectedDocId(d.document_id);
-                          setTab("query");
-                        }}
-                        className="shrink-0 rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
-                      >
-                        Query this
-                      </button>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setSelectedDocId(d.document_id);
+                            setTab("query");
+                          }}
+                          className="rounded-md border border-zinc-200 px-3 py-1.5 text-xs font-medium hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                        >
+                          Query this
+                        </button>
+                        <button
+                          onClick={() => handleDelete(d.document_id, d.filename)}
+                          className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/40"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>

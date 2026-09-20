@@ -112,3 +112,23 @@ export async function runQuery(
 }
 
 export { API_URL };
+
+export async function deleteDocument(documentId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/documents/${documentId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    let detail = `Request failed with status ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body.detail)
+        detail =
+          typeof body.detail === "string"
+            ? body.detail
+            : JSON.stringify(body.detail);
+    } catch {
+      // ignore
+    }
+    throw new Error(detail);
+  }
+}

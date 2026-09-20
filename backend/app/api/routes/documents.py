@@ -218,3 +218,38 @@ async def get_document(
         status=document.status,
         created_at=document.created_at,
     )
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_document(
+    document_id: str,
+    container: ApplicationContainer = Depends(get_container),
+) -> None:
+    """Delete a document, its pages, and remove it from the search index."""
+
+    document = container.repository.get_by_id(document_id)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document not found: {document_id}",
+        )
+
+    try:
+        container.index_lifecycle.remove_document(document_id)
+    except Exception:
+        logger.exception("Failed removing document from index: %s", document_id)
+
+    try:
+        container.page_store.delete_document(document_id)
+    except Exception:
+        logger.exception("Failed deleting page files: %s", document_id)
+
+    try:
+        source = Path(document.source_path)
+        raw_root = Path(container.settings.raw_data_dir).resolve()
+        if source.exists() and str(source.resolve()).startswith(str(raw_root)):
+            source.unlink(missing_ok=True)
+    except Exception:
+        logger.exception("Failed deleting source file for %s", document_id)
+
+    container.repository.delete(document_id)
