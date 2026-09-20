@@ -28,6 +28,16 @@ export interface QueryResponse {
   citations: Citation[];
 }
 
+export interface DocumentProgress {
+  document_id: string;
+  status: string;
+  total_pages: number;
+  processed_pages: number;
+  percent: number;
+  message: string;
+  error: string | null;
+}
+
 export interface HealthResponse {
   status: string;
   service: string;
@@ -40,7 +50,11 @@ async function handleResponse<T>(res: Response): Promise<T> {
     let detail = `Request failed with status ${res.status}`;
     try {
       const body = await res.json();
-      if (body.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      if (body.detail)
+        detail =
+          typeof body.detail === "string"
+            ? body.detail
+            : JSON.stringify(body.detail);
     } catch {
       // ignore
     }
@@ -62,15 +76,23 @@ export async function listDocuments(): Promise<DocumentListResponse> {
 export async function uploadDocument(file: File): Promise<Document> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_URL}/documents`, {
-    method: "POST",
-    body: form,
-  });
+  const res = await fetch(`${API_URL}/documents`, { method: "POST", body: form });
   return handleResponse<Document>(res);
 }
 
+export async function getDocumentProgress(
+  documentId: string
+): Promise<DocumentProgress> {
+  const res = await fetch(`${API_URL}/documents/${documentId}/progress`, {
+    cache: "no-store",
+  });
+  return handleResponse<DocumentProgress>(res);
+}
+
 export async function getDocument(documentId: string): Promise<Document> {
-  const res = await fetch(`${API_URL}/documents/${documentId}`, { cache: "no-store" });
+  const res = await fetch(`${API_URL}/documents/${documentId}`, {
+    cache: "no-store",
+  });
   return handleResponse<Document>(res);
 }
 

@@ -7,7 +7,9 @@ import {
   uploadDocument,
   runQuery,
   getHealth,
+  getDocumentProgress,
   QueryResponse,
+  DocumentProgress,
   API_URL,
 } from "@/lib/api";
 import { AnswerView } from "@/components/AnswerView";
@@ -21,6 +23,7 @@ export default function Home() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [ingestProgress, setIngestProgress] = useState<DocumentProgress | null>(null);
 
   const [question, setQuestion] = useState("");
   const [querying, setQuerying] = useState(false);
@@ -29,6 +32,13 @@ export default function Home() {
 
   const [health, setHealth] = useState<{ status: string; indexed_pages: number } | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
+
+  // Helper function to update health state to avoid repeated calls
+  const fetchHealth = useCallback(() => {
+    getHealth()
+      .then((h) => setHealth({ status: h.status, indexed_pages: h.indexed_pages }))
+      .catch(() => setHealth(null));
+  }, []);
 
   const refreshDocuments = useCallback(async () => {
     setLoadingDocs(true);
@@ -45,14 +55,13 @@ export default function Home() {
 
   useEffect(() => {
     refreshDocuments();
-    getHealth()
-      .then((h) => setHealth({ status: h.status, indexed_pages: h.indexed_pages }))
-      .catch(() => setHealth(null));
-  }, [refreshDocuments]);
+    fetchHealth();
+  }, [refreshDocuments, fetchHealth]);
 
-    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     if (!file.name.toLowerCase().endsWith(".pdf")) {
       setUploadError("Only PDF files are supported.");
       e.target.value = "";
@@ -92,13 +101,40 @@ export default function Home() {
 
     setUploading(true);
     setUploadError(null);
+    setIngestProgress(null);
+
     try {
       const doc = await uploadDocument(file);
-      await refreshDocuments();
-      getHealth()
-        .then((h) => setHealth({ status: h.status, indexed_pages: h.indexed_pages }))
-        .catch(() => null);
       setSelectedDocId(doc.document_id);
+      await refreshDocuments();
+
+      if (doc.duplicate || doc.status === "processed") {
+        setIngestProgress(null);
+        fetchHealth();
+      } else {
+        // Poll background OCR progress
+        const id = doc.document_id;
+        for (let i = 0; i < 600; i++) {
+          await new Promise((r) => setTimeout(r, 1500));
+          try {
+            const prog = await getDocumentProgress(id);
+            setIngestProgress(prog);
+
+            if (prog.status === "processed") {
+              await refreshDocuments();
+              fetchHealth();
+              break;
+            }
+
+            if (prog.status === "failed") {
+              setUploadError(prog.error || prog.message || "Ingestion failed");
+              break;
+            }
+          } catch {
+            // keep polling briefly if one request fails
+          }
+        }
+      }
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -110,9 +146,11 @@ export default function Home() {
   const handleQuery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!question.trim()) return;
+
     setQuerying(true);
     setQueryError(null);
     setResult(null);
+
     try {
       const res = await runQuery(question.trim(), selectedDocId);
       setResult(res);
@@ -122,6 +160,11 @@ export default function Home() {
       setQuerying(false);
     }
   };
+
+  const tabItems: { key: Tab; label: string }[] = [
+    { key: "query", label: "Ask a question" },
+    { key: "documents", label: `Documents (${documents.length})` },
+  ];
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -157,26 +200,19 @@ export default function Home() {
 
       <div className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto flex max-w-5xl gap-1 px-4 sm:px-6">
-          <button
-            onClick={() => setTab("query")}
-            className={`px-4 py-3 text-sm font-medium transition-colors ${
-              tab === "query"
-                ? "border-b-2 border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-100"
-                : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-            }`}
-          >
-            Ask a question
-          </button>
-          <button
-            onClick={() => setTab("documents")}
-            className={`px-4 py-3 text-sm font-medium transition-colors ${
-              tab === "documents"
-                ? "border-b-2 border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-100"
-                : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
-            }`}
-          >
-            Documents ({documents.length})
-          </button>
+          {tabItems.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setTab(item.key)}
+              className={`px-4 py-3 text-sm font-medium transition-colors ${
+                tab === item.key
+                  ? "border-b-2 border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -273,6 +309,28 @@ export default function Home() {
               </label>
               {uploadError && (
                 <p className="mt-3 text-sm text-red-600 dark:text-red-400">{uploadError}</p>
+              )}
+              {ingestProgress && ingestProgress.status === "processing" && (
+                <div className="mx-auto mt-4 max-w-md text-left">
+                  <div className="mb-1 flex justify-between text-xs text-zinc-500">
+                    <span>{ingestProgress.message}</span>
+                    <span>{ingestProgress.percent}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
+                    <div
+                      className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+                      style={{ width: `${ingestProgress.percent}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-zinc-400">
+                    {ingestProgress.processed_pages}/{ingestProgress.total_pages || "?"} pages
+                  </p>
+                </div>
+              )}
+              {ingestProgress && ingestProgress.status === "processed" && (
+                <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">
+                  Ingestion complete — ready to query.
+                </p>
               )}
             </div>
 

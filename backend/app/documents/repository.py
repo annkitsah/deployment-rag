@@ -185,3 +185,33 @@ class DocumentRepository:
             status=DocumentStatus(row["status"]),
             created_at=datetime.fromisoformat(row["created_at"]),
         )
+
+    def update_status(
+        self,
+        document_id: str,
+        status: DocumentStatus,
+        *,
+        page_count: int | None = None,
+    ) -> None:
+        """Update document status and optional page_count after async ingest."""
+
+        with sqlite3.connect(self.database_path) as connection:
+            if page_count is None:
+                connection.execute(
+                    """
+                    UPDATE documents
+                    SET status = ?
+                    WHERE document_id = ?
+                    """,
+                    (status.value, document_id),
+                )
+            else:
+                connection.execute(
+                    """
+                    UPDATE documents
+                    SET status = ?, page_count = ?
+                    WHERE document_id = ?
+                    """,
+                    (status.value, page_count, document_id),
+                )
+            connection.commit()
