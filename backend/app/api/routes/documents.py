@@ -8,10 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFi
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.dependencies import get_container
-from app.api.schemas import (
-    DocumentListResponse,
-    DocumentResponse,
-)
+from app.api.schemas import DocumentListResponse, DocumentResponse
 from app.container import ApplicationContainer
 from app.ingestion.progress import progress_registry
 
@@ -21,8 +18,6 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 
 class DocumentProgressResponse(BaseModel):
-    """OCR/index progress for a document being ingested."""
-
     model_config = ConfigDict(frozen=True)
 
     document_id: str
@@ -32,6 +27,7 @@ class DocumentProgressResponse(BaseModel):
     percent: int = Field(ge=0, le=100)
     message: str = ""
     error: str | None = None
+
 
 def _friendly_ingest_error(exc: Exception) -> tuple[int, str]:
     msg = str(exc)
@@ -238,8 +234,6 @@ async def delete_document(
     document_id: str,
     container: ApplicationContainer = Depends(get_container),
 ) -> None:
-    """Delete a document, its pages, and remove it from the search index."""
-
     document = container.repository.get_by_id(document_id)
     if document is None:
         raise HTTPException(
