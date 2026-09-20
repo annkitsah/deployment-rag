@@ -5,11 +5,11 @@ from uuid import uuid4
 
 import pymupdf
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, status
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.dependencies import get_container
 from app.api.schemas import (
     DocumentListResponse,
-    DocumentProgressResponse,
     DocumentResponse,
 )
 from app.container import ApplicationContainer
@@ -19,6 +19,19 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
+
+class DocumentProgressResponse(BaseModel):
+    """OCR/index progress for a document being ingested."""
+
+    model_config = ConfigDict(frozen=True)
+
+    document_id: str
+    status: str
+    total_pages: int = Field(ge=0)
+    processed_pages: int = Field(ge=0)
+    percent: int = Field(ge=0, le=100)
+    message: str = ""
+    error: str | None = None
 
 def _friendly_ingest_error(exc: Exception) -> tuple[int, str]:
     msg = str(exc)
