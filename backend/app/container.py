@@ -69,6 +69,8 @@ class ApplicationContainer:
             ocr_pipeline=self.ocr_pipeline,
             processed_root=Path(settings.processed_data_dir),
             index_lifecycle=self.index_lifecycle,
+            ocr_chunk_size=settings.ocr_chunk_size,
+            ocr_chunk_pause_ms=settings.ocr_chunk_pause_ms,
         )
 
         self.candidate_retriever = CandidateRetriever(

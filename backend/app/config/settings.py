@@ -79,6 +79,9 @@ class Settings(BaseSettings):
 
     ocr_enabled: bool = True
 
+    max_upload_pages: int = Field(default=25, ge=1, le=500)
+    max_upload_mb: int = Field(default=50, ge=1, le=200)
+
     # Generation provider: "groq" | "mistral" | "ollama"
     generation_provider: str = "groq"
 
@@ -88,6 +91,10 @@ class Settings(BaseSettings):
         default=120_000,
         gt=0,
     )
+
+    # Chunked OCR: process this many pages, then pause (helps rate limits).
+    ocr_chunk_size: int = Field(default=5, ge=1, le=50)
+    ocr_chunk_pause_ms: int = Field(default=1500, ge=0, le=60_000)
 
     @property
     def cors_allowed_origins_list(self) -> list[str]:
