@@ -68,3 +68,16 @@ class QueryResponse(BaseModel):
     answer: str
     iterations: int = Field(ge=0)
     citations: tuple[CitationResponse, ...] = ()
+
+class DocumentProgressResponse(BaseModel):
+    """OCR/index progress for a document being ingested."""
+
+    model_config = ConfigDict(frozen=True)
+
+    document_id: str
+    status: str
+    total_pages: int = Field(ge=0)
+    processed_pages: int = Field(ge=0)
+    percent: int = Field(ge=0, le=100)
+    message: str = ""
+    error: str | None = None
