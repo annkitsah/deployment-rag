@@ -6,10 +6,13 @@ from app.api.dependencies import get_container
 from app.api.schemas import CitationResponse, QueryRequest, QueryResponse
 from app.citations.models import Citation
 from app.container import ApplicationContainer
+from app.api.auth import require_app_password
+
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["query"])
+router = APIRouter(tags=["query"],
+    dependencies=[Depends(require_app_password)],)
 
 
 @router.post("/query", response_model=QueryResponse)

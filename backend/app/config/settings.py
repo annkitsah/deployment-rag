@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     app_name: str = "agentic-true-vectorless-rag"
     app_env: str = "development"
     log_level: str = "INFO"
+    
+    # Shared password for demo access. Empty = auth disabled.
+    app_password: str = ""
 
     cors_allowed_origins: str = "http://localhost:3000"
 

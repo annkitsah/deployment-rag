@@ -8,10 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from app.api.dependencies import get_container
 from app.api.schemas import DocumentListResponse, DocumentResponse
 from app.container import ApplicationContainer
+from app.api.auth import require_app_password
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/documents", tags=["documents"])
+router = APIRouter(prefix="/documents", tags=["documents"],
+    dependencies=[Depends(require_app_password)],)
 
 
 @router.post(

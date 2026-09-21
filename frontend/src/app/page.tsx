@@ -9,6 +9,9 @@ import {
   runQuery,
   getHealth,
   getDocumentProgress,
+  setStoredPassword,
+  clearStoredPassword,
+  getStoredPassword,
   QueryResponse,
   DocumentProgress,
   API_URL,
@@ -34,6 +37,10 @@ export default function Home() {
   const [health, setHealth] = useState<{ status: string; indexed_pages: number } | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
 
+  const [authed, setAuthed] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+
   const fetchHealth = useCallback(() => {
     getHealth()
       .then((h) => setHealth({ status: h.status, indexed_pages: h.indexed_pages }))
@@ -54,9 +61,28 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (getStoredPassword()) setAuthed(true);
+  }, []);
+
+  useEffect(() => {
+    if (!authed) return;
     refreshDocuments();
     fetchHealth();
-  }, [refreshDocuments, fetchHealth]);
+  }, [authed, refreshDocuments, fetchHealth]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    setStoredPassword(passwordInput);
+    try {
+      await listDocuments();
+      setAuthed(true);
+    } catch {
+      clearStoredPassword();
+      setLoginError("Wrong password");
+      setAuthed(false);
+    }
+  };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -109,28 +135,29 @@ export default function Home() {
       if (doc.duplicate || doc.status === "processed") {
         setIngestProgress(null);
         fetchHealth();
-      } else {
+      } else if (doc.status === "processing") {
         const id = doc.document_id;
         for (let i = 0; i < 600; i++) {
           await new Promise((r) => setTimeout(r, 1500));
           try {
             const prog = await getDocumentProgress(id);
             setIngestProgress(prog);
-
             if (prog.status === "processed") {
               await refreshDocuments();
               fetchHealth();
               break;
             }
-
             if (prog.status === "failed") {
               setUploadError(prog.error || prog.message || "Ingestion failed");
               break;
             }
           } catch {
-            // keep polling
+            // progress endpoint may be unavailable; stop polling
+            break;
           }
         }
+      } else {
+        fetchHealth();
       }
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
@@ -179,6 +206,39 @@ export default function Home() {
     { key: "documents", label: `Documents (${documents.length})` },
   ];
 
+  if (!authed) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <form
+          onSubmit={handleLogin}
+          className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+        >
+          <h1 className="mb-1 text-lg font-semibold">Agentic Vectorless RAG</h1>
+          <p className="mb-4 text-sm text-zinc-500">
+            Enter the demo password to continue
+          </p>
+          <input
+            type="password"
+            value={passwordInput}
+            onChange={(e) => setPasswordInput(e.target.value)}
+            className="mb-3 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
+            placeholder="Password"
+            autoFocus
+          />
+          {loginError && (
+            <p className="mb-2 text-sm text-red-600">{loginError}</p>
+          )}
+          <button
+            type="submit"
+            className="w-full rounded-lg bg-zinc-900 py-2.5 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+          >
+            Unlock
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
@@ -204,6 +264,16 @@ export default function Home() {
             ) : (
               <span className="text-zinc-400">API offline</span>
             )}
+            <button
+              type="button"
+              onClick={() => {
+                clearStoredPassword();
+                setAuthed(false);
+              }}
+              className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+            >
+              Logout
+            </button>
             <span className="hidden text-xs text-zinc-400 sm:inline" title={API_URL}>
               {API_URL.replace(/^https?:\/\//, "").slice(0, 28)}
             </span>
@@ -233,11 +303,6 @@ export default function Home() {
         {apiError && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200">
             <strong>Backend unreachable.</strong> {apiError}
-            <br />
-            <span className="text-xs opacity-80">
-              Set <code className="rounded bg-black/5 px-1">NEXT_PUBLIC_API_URL</code> to your
-              FastAPI backend URL (e.g. https://your-api.example.com).
-            </span>
           </div>
         )}
 
