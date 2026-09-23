@@ -4,17 +4,20 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 
+from app.api.auth import require_app_password
 from app.api.dependencies import get_container
 from app.api.schemas import DocumentListResponse, DocumentResponse
 from app.container import ApplicationContainer
-from app.api.auth import require_app_password
-from fastapi.responses import FileResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/documents", tags=["documents"],
-    dependencies=[Depends(require_app_password)],)
+router = APIRouter(
+    prefix="/documents",
+    tags=["documents"],
+    dependencies=[Depends(require_app_password)],
+)
 
 
 @router.post(
@@ -132,6 +135,7 @@ async def delete_document(
     if not hasattr(container.repository, "delete"):
         raise HTTPException(status_code=500, detail="repository.delete is not deployed")
     container.repository.delete(document_id)
+
 
 @router.get("/{document_id}/file")
 async def get_document_file(
