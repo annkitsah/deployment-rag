@@ -9,6 +9,7 @@ from app.api.dependencies import get_container
 from app.api.schemas import DocumentListResponse, DocumentResponse
 from app.container import ApplicationContainer
 from app.api.auth import require_app_password
+from fastapi.responses import FileResponse
 
 logger = logging.getLogger(__name__)
 
@@ -131,3 +132,26 @@ async def delete_document(
     if not hasattr(container.repository, "delete"):
         raise HTTPException(status_code=500, detail="repository.delete is not deployed")
     container.repository.delete(document_id)
+
+@router.get("/{document_id}/file")
+async def get_document_file(
+    document_id: str,
+    container: ApplicationContainer = Depends(get_container),
+) -> FileResponse:
+    document = container.repository.get_by_id(document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail=f"Document not found: {document_id}")
+
+    source = Path(document.source_path)
+    if not source.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="Original PDF file is missing on the server.",
+        )
+
+    return FileResponse(
+        path=source,
+        media_type="application/pdf",
+        filename=document.filename,
+        content_disposition_type="inline",
+    )
