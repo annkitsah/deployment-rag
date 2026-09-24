@@ -83,6 +83,18 @@ class AgentOrchestrator:
                 )
 
             if decision.decision_type is AgentDecisionType.STOP:
+                # Last resort: if we retrieved pages, answer from them
+                # instead of returning only the stop reason to the UI.
+                if state.contexts and state.contexts[-1].page_count > 0:
+                    latest_context = state.contexts[-1]
+                    return self._build_response(
+                        state,
+                        answer=self.answerer.answer(
+                            state.current_query,
+                            latest_context,
+                        ),
+                        citations=build_citations(latest_context),
+                    )
                 return self._build_response(
                     state,
                     answer=self._build_stop_response(state),
