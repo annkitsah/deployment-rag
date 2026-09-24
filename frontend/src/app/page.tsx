@@ -20,6 +20,12 @@ import { AnswerView } from "@/components/AnswerView";
 
 type Tab = "query" | "documents";
 
+type BatchItem = {
+  name: string;
+  status: "queued" | "uploading" | "done" | "error" | "skipped";
+  message?: string;
+};
+
 export default function Home() {
   const [tab, setTab] = useState<Tab>("query");
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -28,6 +34,7 @@ export default function Home() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [ingestProgress, setIngestProgress] = useState<DocumentProgress | null>(null);
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
 
   const [question, setQuestion] = useState("");
   const [querying, setQuerying] = useState(false);
@@ -85,85 +92,80 @@ export default function Home() {
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const list = e.target.files;
+    if (!list || list.length === 0) return;
 
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      setUploadError("Only PDF files are supported.");
-      e.target.value = "";
-      return;
-    }
+    const files = Array.from(list);
+    e.target.value = "";
 
-    const sizeMb = file.size / (1024 * 1024);
-
-    if (sizeMb > 50) {
-      window.alert(
-        `File size limit exceeded\n\n` +
-          `This PDF is ${sizeMb.toFixed(1)} MB.\n` +
-          `Maximum allowed size is 50 MB.\n\n` +
-          `Please split the PDF or upload a smaller file.`
-      );
-      setUploadError(
-        `File is ${sizeMb.toFixed(1)} MB and exceeds the 50 MB limit. Please upload a smaller PDF.`
-      );
-      e.target.value = "";
-      return;
-    }
-
-    if (sizeMb > 30) {
-      const ok = window.confirm(
-        `Large PDF (${sizeMb.toFixed(1)} MB)\n\n` +
-          `Files under 30 MB work most reliably.\n` +
-          `This file may take longer and is more likely to hit OCR rate limits.\n\n` +
-          `Continue with upload?`
-      );
-      if (!ok) {
-        e.target.value = "";
-        return;
-      }
-    }
-
-    setUploading(true);
+    const items: BatchItem[] = files.map((f) => ({
+      name: f.name,
+      status: "queued",
+    }));
+    setBatchItems(items);
     setUploadError(null);
     setIngestProgress(null);
+    setUploading(true);
+
+    const updateItem = (index: number, patch: Partial<BatchItem>) => {
+      setBatchItems((prev) =>
+        prev.map((it, i) => (i === index ? { ...it, ...patch } : it))
+      );
+    };
 
     try {
-      const doc = await uploadDocument(file);
-      setSelectedDocId(doc.document_id);
-      await refreshDocuments();
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
 
-      if (doc.duplicate || doc.status === "processed") {
-        setIngestProgress(null);
-        fetchHealth();
-      } else if (doc.status === "processing") {
-        const id = doc.document_id;
-        for (let i = 0; i < 600; i++) {
-          await new Promise((r) => setTimeout(r, 1500));
-          try {
-            const prog = await getDocumentProgress(id);
-            setIngestProgress(prog);
-            if (prog.status === "processed") {
-              await refreshDocuments();
-              fetchHealth();
-              break;
-            }
-            if (prog.status === "failed") {
-              setUploadError(prog.error || prog.message || "Ingestion failed");
-              break;
-            }
-          } catch {
-            // progress endpoint may be unavailable; stop polling
-            break;
+        if (!file.name.toLowerCase().endsWith(".pdf")) {
+          updateItem(i, { status: "skipped", message: "Not a PDF" });
+          continue;
+        }
+
+        const sizeMb = file.size / (1024 * 1024);
+
+        if (sizeMb > 50) {
+          updateItem(i, {
+            status: "skipped",
+            message: `${sizeMb.toFixed(1)} MB > 50 MB limit`,
+          });
+          continue;
+        }
+
+        if (sizeMb > 30) {
+          const ok = window.confirm(
+            `Large PDF: ${file.name} (${sizeMb.toFixed(1)} MB)\n\n` +
+              `Files under 30 MB are more reliable.\nContinue with this file?`
+          );
+          if (!ok) {
+            updateItem(i, { status: "skipped", message: "Skipped by user" });
+            continue;
           }
         }
-      } else {
-        fetchHealth();
+
+        updateItem(i, { status: "uploading", message: "Uploading…" });
+
+        try {
+          const doc = await uploadDocument(file);
+          setSelectedDocId(doc.document_id);
+          updateItem(i, {
+            status: "done",
+            message: doc.duplicate
+              ? "Already indexed (duplicate)"
+              : `OK · ${doc.page_count} pages · ${doc.status}`,
+          });
+        } catch (err) {
+          updateItem(i, {
+            status: "error",
+            message: err instanceof Error ? err.message : "Upload failed",
+          });
+        }
       }
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Upload failed");
+
+      await refreshDocuments();
+      fetchHealth();
     } finally {
       setUploading(false);
-      e.target.value = "";
     }
   };
 
@@ -372,22 +374,52 @@ export default function Home() {
           <div className="space-y-6">
             <div className="rounded-xl border border-dashed border-zinc-300 bg-white p-6 text-center dark:border-zinc-700 dark:bg-zinc-900">
               <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
-                Recommended: under 25 pages and 30 MB. Hard limit: 50 MB.
-                Large files may hit rate limits or time out.
+                Select multiple PDFs at once. Each file max 50 MB (30 MB recommended).
+                Very large folders need async workers later.
               </p>
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white">
-                {uploading ? "Uploading & ingesting…" : "Choose PDF"}
+                {uploading ? "Uploading batch…" : "Choose PDFs (one or many)"}
                 <input
                   type="file"
                   accept=".pdf,application/pdf"
+                  multiple
                   className="hidden"
                   onChange={handleUpload}
                   disabled={uploading}
                 />
               </label>
+
               {uploadError && (
                 <p className="mt-3 text-sm text-red-600 dark:text-red-400">{uploadError}</p>
               )}
+
+              {batchItems.length > 0 && (
+                <ul className="mx-auto mt-4 max-w-lg space-y-1.5 text-left text-sm">
+                  {batchItems.map((it, i) => (
+                    <li
+                      key={`${it.name}-${i}`}
+                      className="flex items-start justify-between gap-2 rounded-md border border-zinc-200 px-3 py-2 dark:border-zinc-700"
+                    >
+                      <span className="min-w-0 truncate font-medium">{it.name}</span>
+                      <span
+                        className={
+                          it.status === "done"
+                            ? "shrink-0 text-xs text-emerald-600"
+                            : it.status === "error" || it.status === "skipped"
+                              ? "shrink-0 text-xs text-red-600"
+                              : it.status === "uploading"
+                                ? "shrink-0 text-xs text-amber-600"
+                                : "shrink-0 text-xs text-zinc-500"
+                        }
+                      >
+                        {it.status}
+                        {it.message ? ` · ${it.message}` : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
               {ingestProgress && ingestProgress.status === "processing" && (
                 <div className="mx-auto mt-4 max-w-md text-left">
                   <div className="mb-1 flex justify-between text-xs text-zinc-500">
@@ -400,15 +432,7 @@ export default function Home() {
                       style={{ width: `${ingestProgress.percent}%` }}
                     />
                   </div>
-                  <p className="mt-1 text-xs text-zinc-400">
-                    {ingestProgress.processed_pages}/{ingestProgress.total_pages || "?"} pages
-                  </p>
                 </div>
-              )}
-              {ingestProgress && ingestProgress.status === "processed" && (
-                <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">
-                  Ingestion complete — ready to query.
-                </p>
               )}
             </div>
 
@@ -427,7 +451,7 @@ export default function Home() {
                 <p className="px-4 py-8 text-center text-sm text-zinc-400">Loading…</p>
               ) : documents.length === 0 ? (
                 <p className="px-4 py-8 text-center text-sm text-zinc-400">
-                  No documents yet. Upload a PDF to get started.
+                  No documents yet. Upload PDFs to get started.
                 </p>
               ) : (
                 <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
