@@ -56,6 +56,16 @@ class AgentDecisionEngine(DecisionEngine):
             )
 
         if state.iteration >= self.max_iterations:
+            # Prefer answering with whatever context we have rather than
+            # returning the bare "max iterations" string to the user.
+            if state.contexts and state.contexts[-1].page_count > 0:
+                return AgentDecision(
+                    decision_type=AgentDecisionType.ANSWER,
+                    reason=(
+                        "Maximum agent iterations reached; "
+                        "answering with the best retrieved context."
+                    ),
+                )
             return AgentDecision(
                 decision_type=AgentDecisionType.STOP,
                 reason="Maximum agent iterations reached.",
