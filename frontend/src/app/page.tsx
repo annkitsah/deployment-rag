@@ -95,8 +95,16 @@ export default function Home() {
     const list = e.target.files;
     if (!list || list.length === 0) return;
 
-    const files = Array.from(list);
+    const allFiles = Array.from(list);
     e.target.value = "";
+
+    // Folder picks include every file type — keep PDFs only
+    const files = allFiles.filter((f) => f.name.toLowerCase().endsWith(".pdf"));
+    if (files.length === 0) {
+      setUploadError("No PDF files found in that selection.");
+      setBatchItems([]);
+      return;
+    }
 
     const items: BatchItem[] = files.map((f) => ({
       name: f.name,
@@ -116,12 +124,6 @@ export default function Home() {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-
-        if (!file.name.toLowerCase().endsWith(".pdf")) {
-          updateItem(i, { status: "skipped", message: "Not a PDF" });
-          continue;
-        }
-
         const sizeMb = file.size / (1024 * 1024);
 
         if (sizeMb > 50) {
@@ -198,10 +200,7 @@ export default function Home() {
       setResult(res);
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Query failed";
-      if (
-        raw.toLowerCase().includes("rate limit") ||
-        raw.includes("429")
-      ) {
+      if (raw.toLowerCase().includes("rate limit") || raw.includes("429")) {
         setQueryError(
           "AI rate limit reached. Wait 30–60 seconds, then try again. " +
             "Tip: ask a more specific question or select a single document."
@@ -389,20 +388,34 @@ export default function Home() {
           <div className="space-y-6">
             <div className="rounded-xl border border-dashed border-zinc-300 bg-white p-6 text-center dark:border-zinc-700 dark:bg-zinc-900">
               <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">
-                Select multiple PDFs at once. Each file max 50 MB (30 MB recommended).
-                Very large folders need async workers later.
+                Select multiple PDFs, or a whole folder (Chrome/Edge). Each file
+                max 50 MB (30 MB recommended).
               </p>
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white">
-                {uploading ? "Uploading batch…" : "Choose PDFs (one or many)"}
-                <input
-                  type="file"
-                  accept=".pdf,application/pdf"
-                  multiple
-                  className="hidden"
-                  onChange={handleUpload}
-                  disabled={uploading}
-                />
-              </label>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white">
+                  {uploading ? "Uploading batch…" : "Choose PDFs"}
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    multiple
+                    className="hidden"
+                    onChange={handleUpload}
+                    disabled={uploading}
+                  />
+                </label>
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900">
+                  {uploading ? "Uploading…" : "Choose folder"}
+                  <input
+                    type="file"
+                    // @ts-expect-error non-standard attribute used for folder selection in Chromium
+                    webkitdirectory=""
+                    multiple
+                    className="hidden"
+                    onChange={handleUpload}
+                    disabled={uploading}
+                  />
+                </label>
+              </div>
 
               {uploadError && (
                 <p className="mt-3 text-sm text-red-600 dark:text-red-400">{uploadError}</p>
