@@ -101,6 +101,18 @@ class PageContentClassifier:
                 reasons=("usable_native_text",),
             )
 
+
+
+        # Strong native text with decorative images (logos, charts) — still skip OCR
+        if stripped_text_length >= 120 and quality.printable_ratio >= 0.85:
+            return PageProcessingDecisionResult(
+                page_number=page_number,
+                decision=PageProcessingDecision.NATIVE_TEXT,
+                text_quality=quality,
+                content=content,
+                reasons=("prefer_native_text_over_ocr",),
+            )
+        
         # ---------------------------------------------------------
         # 3. Raster image + unusable text
         # ---------------------------------------------------------

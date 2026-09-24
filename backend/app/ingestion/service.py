@@ -179,7 +179,7 @@ class IngestionService:
                         progress_registry.update(
                             document_id,
                             processed_pages=done_count,
-                            message=f"OCR page {page_number} of {page_count}…",
+                            message=f"Processing page {page_number} of {page_count} (native text first)…",
                         )
                         result = self.ocr_pipeline.process_page(
                             pdf_path=file_path,

@@ -9,10 +9,10 @@ class TextQualityAnalyzer:
     def __init__(
         self,
         *,
-        minimum_characters: int = 80,
+        minimum_characters: int = 40,
         minimum_alphabetic_ratio: float = 0.25,
         minimum_printable_ratio: float = 0.90,
-        minimum_quality_score: float = 0.45,
+        minimum_quality_score: float = 0.35,
     ) -> None:
         if minimum_characters < 0:
             raise ValueError(
@@ -117,7 +117,12 @@ class TextQualityAnalyzer:
         if quality_score < self.minimum_quality_score:
             reasons.append("low_quality_score")
 
-        ocr_required = bool(reasons)
+        substantial_native = (
+            alphabetic_character_count >= 60
+            and printable_ratio >= 0.85
+            and replacement_character_count == 0
+        )
+        ocr_required = bool(reasons) and not substantial_native
 
         return TextQualityResult(
             character_count=character_count,
