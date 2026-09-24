@@ -197,7 +197,22 @@ export default function Home() {
       const res = await runQuery(question.trim(), selectedDocId);
       setResult(res);
     } catch (err) {
-      setQueryError(err instanceof Error ? err.message : "Query failed");
+      const raw = err instanceof Error ? err.message : "Query failed";
+      if (
+        raw.toLowerCase().includes("rate limit") ||
+        raw.includes("429")
+      ) {
+        setQueryError(
+          "AI rate limit reached. Wait 30–60 seconds, then try again. " +
+            "Tip: ask a more specific question or select a single document."
+        );
+      } else if (raw.includes("413") || raw.toLowerCase().includes("too large")) {
+        setQueryError(
+          "Too much context for the model. Try a narrower question or one document only."
+        );
+      } else {
+        setQueryError(raw);
+      }
     } finally {
       setQuerying(false);
     }
