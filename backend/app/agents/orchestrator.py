@@ -83,18 +83,20 @@ class AgentOrchestrator:
                 )
 
             if decision.decision_type is AgentDecisionType.STOP:
-                # Last resort: if we retrieved pages, answer from them
-                # instead of returning only the stop reason to the UI.
-                if state.contexts and state.contexts[-1].page_count > 0:
+                # Last resort: never show only "max iterations" if we have context.
+                if state.contexts:
                     latest_context = state.contexts[-1]
-                    return self._build_response(
-                        state,
-                        answer=self.answerer.answer(
-                            state.current_query,
-                            latest_context,
-                        ),
-                        citations=build_citations(latest_context),
-                    )
+                    try:
+                        return self._build_response(
+                            state,
+                            answer=self.answerer.answer(
+                                state.current_query,
+                                latest_context,
+                            ),
+                            citations=build_citations(latest_context),
+                        )
+                    except Exception:
+                        pass
                 return self._build_response(
                     state,
                     answer=self._build_stop_response(state),
@@ -125,25 +127,16 @@ class AgentOrchestrator:
     def _build_stop_response(
         state: AgentState,
     ) -> str:
-        """Build a deterministic response when execution must stop.
+        """Build a deterministic response when execution must stop."""
 
-        Prefers the triggering decision's reason (a clear, human-facing
-        explanation of why the agent gave up -- e.g. "off-topic
-        excerpts" or "iteration cap reached") over dumping the latest
-        raw retrieved page text, which previously surfaced verbatim,
-        `[Source: ...]` markup and all, whenever *any* context existed
-        at stop time -- even context an LLM judge had just determined
-        didn't actually answer the question.
-        """
+        # Prefer a human reason only when there is no usable context.
+        if state.contexts:
+            latest_context = state.contexts[-1]
+            if latest_context.text.strip():
+                return latest_context.text
 
         if state.decision is not None and state.decision.reason:
             return state.decision.reason
-
-        if state.contexts:
-            latest_context = state.contexts[-1]
-
-            if latest_context.text.strip():
-                return latest_context.text
 
         return "The agent could not retrieve sufficient context."
 
