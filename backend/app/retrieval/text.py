@@ -98,3 +98,36 @@ def term_frequency(
         frequencies[token] = frequencies.get(token, 0) + 1
 
     return frequencies
+
+
+# Lightweight expansions so short acronyms still match lexical pages.
+_QUERY_EXPANSIONS: dict[str, str] = {
+    "faiss": "faiss facebook ai similarity search vector index",
+    "rag": "rag retrieval augmented generation",
+    "llm": "llm large language model",
+    "ocr": "ocr optical character recognition",
+    "gpu": "gpu graphics processing unit",
+    "api": "api application programming interface",
+    "nlp": "nlp natural language processing",
+    "ml": "ml machine learning",
+    "ai": "ai artificial intelligence",
+}
+
+
+def expand_query(text: str) -> str:
+    """Append known expansions for acronyms present in the query."""
+
+    if not isinstance(text, str):
+        raise TypeError("text must be a string")
+
+    tokens = set(tokenize(text, remove_stopwords=False, min_token_length=1))
+    extras: list[str] = []
+    for token, expansion in _QUERY_EXPANSIONS.items():
+        if token in tokens:
+            extras.append(expansion)
+
+    if not extras:
+        return text
+
+    # Keep original query first; expansions add recall terms.
+    return text.strip() + " " + " ".join(extras)

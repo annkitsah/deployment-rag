@@ -1,6 +1,7 @@
 from app.documents.page_store import PageStore
 from app.retrieval.context import RetrievalContextAssembler
 from app.retrieval.lexical import LexicalRetriever
+from app.retrieval.text import expand_query
 from app.retrieval.models import (
     RetrievalQuery,
     RetrievalResponse,
@@ -28,6 +29,10 @@ class RetrievalService:
         query: RetrievalQuery,
     ) -> RetrievedContext:
         """Retrieve ranked pages and assemble bounded context."""
+
+        expanded = expand_query(query.text)
+        if expanded != query.text:
+            query = query.model_copy(update={"text": expanded})
 
         response: RetrievalResponse = self.retriever.retrieve(query)
 

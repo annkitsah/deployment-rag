@@ -83,9 +83,14 @@ class AgentOrchestrator:
                 )
 
             if decision.decision_type is AgentDecisionType.STOP:
-                # Last resort: never show only "max iterations" if we have context.
-                if state.contexts:
-                    latest_context = state.contexts[-1]
+                # Prefer answering from the best non-empty context if any.
+                usable = [
+                    ctx
+                    for ctx in state.contexts
+                    if ctx.page_count > 0 and ctx.text.strip()
+                ]
+                if usable:
+                    latest_context = usable[-1]
                     try:
                         return self._build_response(
                             state,
@@ -129,16 +134,30 @@ class AgentOrchestrator:
     ) -> str:
         """Build a deterministic response when execution must stop."""
 
-        # Prefer a human reason only when there is no usable context.
-        if state.contexts:
-            latest_context = state.contexts[-1]
-            if latest_context.text.strip():
-                return latest_context.text
+        usable = [
+            ctx
+            for ctx in state.contexts
+            if ctx.page_count > 0 and (ctx.text or "").strip()
+        ]
+        if usable and usable[-1].text.strip():
+            return usable[-1].text
 
         if state.decision is not None and state.decision.reason:
-            return state.decision.reason
+            reason = state.decision.reason.strip()
+            # Never surface the bare max-iterations string alone.
+            if reason.lower().startswith("maximum agent iterations"):
+                return (
+                    "No relevant pages were found in the indexed documents "
+                    "for this question. Try different keywords, a broader "
+                    "phrasing, or scope to a specific document."
+                )
+            return reason
 
-        return "The agent could not retrieve sufficient context."
+        return (
+            "No relevant pages were found in the indexed documents "
+            "for this question. Try different keywords, a broader "
+            "phrasing, or scope to a specific document."
+        )
 
     @staticmethod
     def _build_response(

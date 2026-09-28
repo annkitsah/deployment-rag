@@ -35,7 +35,7 @@ class AgentDecisionEngine(DecisionEngine):
     def __init__(
         self,
         *,
-        max_iterations: int = 3,
+        max_iterations: int = 5,
     ) -> None:
         if max_iterations < 1:
             raise ValueError(
@@ -55,10 +55,15 @@ class AgentDecisionEngine(DecisionEngine):
                 "state must be an AgentState"
             )
 
+        def _usable_contexts() -> bool:
+            return any(
+                ctx.page_count > 0 and ctx.text.strip()
+                for ctx in state.contexts
+            )
+
         if state.iteration >= self.max_iterations:
-            # Prefer answering with whatever context we have rather than
-            # returning the bare "max iterations" string to the user.
-            if state.contexts and state.contexts[-1].page_count > 0:
+            # Only answer if we actually retrieved pages with text.
+            if _usable_contexts():
                 return AgentDecision(
                     decision_type=AgentDecisionType.ANSWER,
                     reason=(
@@ -68,7 +73,11 @@ class AgentDecisionEngine(DecisionEngine):
                 )
             return AgentDecision(
                 decision_type=AgentDecisionType.STOP,
-                reason="Maximum agent iterations reached.",
+                reason=(
+                    "No relevant pages were found in the indexed documents "
+                    "for this question. Try different keywords, a broader "
+                    "phrasing, or scope to a specific document."
+                ),
             )
 
         if not state.contexts:
