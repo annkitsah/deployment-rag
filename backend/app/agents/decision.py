@@ -200,15 +200,13 @@ class LLMDecisionEngine(DecisionEngine):
         if fallback_decision.decision_type is AgentDecisionType.STOP:
             return fallback_decision
 
+        # Max-iterations path: heuristic already decided answer or stop.
+        # Never spend more LLM calls refining.
+        max_iter = getattr(self._fallback, "max_iterations", 5)
+        if state.iteration >= max_iter:
+            return fallback_decision
+
         if fallback_decision.decision_type is AgentDecisionType.REFINE:
-            # The heuristic found no context at all. This is exactly
-            # the case where an LLM-driven query rewrite is most
-            # valuable, so clear next_query rather than propagating
-            # the heuristic's "retry the same query unchanged"
-            # default -- that default exists so the plain heuristic
-            # pairing (AgentDecisionEngine + AgentQueryRefiner) stays
-            # deterministic on its own, but here it would silently
-            # make the configured refiner unreachable.
             return AgentDecision(
                 decision_type=AgentDecisionType.REFINE,
                 reason=fallback_decision.reason,
